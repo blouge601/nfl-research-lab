@@ -3,28 +3,39 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NFL Research Lab — Step 10</title>
-  <link rel="stylesheet" href="src/styles.css"/>
+  <title>NFL Research Lab — Diagnostic</title>
 </head>
-<body>
-  <div id="app">
-    <div style="padding:40px;font-family:system-ui;color:white;background:#07101c;min-height:100vh">
-      <h1>NFL Research Lab</h1>
-      <p>Starting application...</p>
-    </div>
-  </div>
+<body style="margin:0;background:#07101c;color:white;font-family:system-ui;padding:30px">
+  <h1>NFL Research Lab — File Test</h1>
+  <p>Testing JavaScript files...</p>
+  <pre id="result" style="white-space:pre-wrap;background:#101b29;padding:20px;border-radius:10px"></pre>
 
   <script type="module">
-    import("./src/app.js")
-      .catch(error => {
-        document.getElementById("app").innerHTML = `
-          <div style="padding:40px;font-family:system-ui;color:white;background:#07101c;min-height:100vh">
-            <h1>NFL Research Lab — Startup Error</h1>
-            <p>The application loaded, but JavaScript failed to start.</p>
-            <pre style="white-space:pre-wrap;color:#ff8585;background:#101b29;padding:20px;border-radius:10px">${String(error?.stack || error)}</pre>
-          </div>
-        `;
-      });
+    const files = [
+      "./src/data.js",
+      "./src/research.js",
+      "./src/edge.js",
+      "./src/model6.js",
+      "./matchup7.js",
+      "./feature8.js",
+      "./player9.js",
+      "./pipeline10.js",
+      "./src/app.js"
+    ];
+
+    const result = document.getElementById("result");
+    result.textContent = "";
+
+    for (const file of files) {
+      try {
+        await import(file + "?test=" + Date.now());
+        result.textContent += "✅ " + file + " — OK\n";
+      } catch (error) {
+        result.textContent += "\n❌ " + file + " — FAILED\n";
+        result.textContent += String(error?.stack || error) + "\n";
+        break;
+      }
+    }
   </script>
 </body>
 </html>
