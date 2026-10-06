@@ -18,7 +18,7 @@ async function check() {
   const out = document.getElementById("result");
 
   try {
-    const response = await fetch("./src/app.js?v=4");
+    const response = await fetch("./src/app.js?v=5");
     const source = await response.text();
 
     const lines = source.split("\n");
