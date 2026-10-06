@@ -1,28 +1,20 @@
-# NFL Research Lab — Step 10
+# NFL Research Lab — Final
 
-Step 10 productionizes the Step 9 player-matchup model with source-health gates, reproducible research snapshots, rolling out-of-sample validation, and feature ablation.
+A browser-based NFL research console using nflverse release data.
 
-## New capabilities
+## Included
+- Full player-pool Research Board with player tiers and usage filters
+- Player detail profiles and recent-form summaries
+- Player matchup board using schedule, depth and injury context
+- Edge Lab with CSV/JSON market import and implied probability / edge / EV calculations
+- Games schedule
+- Data Health / freshness visibility
+- Local GitHub Pages data first, nflverse release fallback, browser-cache fallback
+- 2025+ depth-chart schema support (`dt`, `team`, `player_name`, `pos_*`)
+- GitHub Actions data refresh + GitHub Pages deployment
 
-- Source registry and freshness health for schedules, player stats, injuries, depth charts, PBP, participation, and NGS.
-- Required-source freshness gate: stale/missing required feeds are visible and can block a production run instead of silently generating a live-looking edge.
-- Snapshot manifest capturing source states, row counts, warehouse version, and player-profile count.
-- Feature ablation comparing baseline projection with position, route/coverage, pass-rush, OL, scenario, and full projections.
-- Rolling weekly out-of-sample error tracking.
-- Validation import for timestamped historical projections/outcomes.
-- Configurable browser ingestion helpers for depth-chart and participation CSV endpoints.
-- Explicit provenance and missing-data states.
+## Market import
+CSV or JSON records should include:
+`player,market,line,odds,projection`
 
-## Data-source notes
-
-nflverse publishes automated releases for PBP/player stats, rosters, snap counts, advanced stats and NGS. Depth charts and injury reports are maintained through the nflverse roster/data ecosystem. Participation is subject to its licensing/availability schedule and should not be treated as a guaranteed live feed.
-
-The browser build remains credential-free. A production deployment should move source ingestion, scheduling, retries, raw-file storage, hashing, and sportsbook/API credentials to a server-side job layer. The UI should consume timestamped normalized snapshots.
-
-## Validation rules
-
-- Do not train/calibrate on the outcome being evaluated.
-- Preserve the timestamp and closing line associated with every prediction.
-- Compare incremental matchup features against the Step 6 baseline.
-- Promote a feature only after repeated out-of-sample improvement, not a single profitable sample.
-- Never fabricate missing participation, injury, depth, or coverage observations.
+This app does not invent missing NFL data. Research signals are informational and should be validated before decisions.
