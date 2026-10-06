@@ -1,44 +1,967 @@
-import {loadResearch,researchPlayer} from './research.js?v=11';
-import {parseMarketText,evaluateProp} from './edge.js?v=11';
-import {buildPrediction,bestBetGate} from './model6.js?v=11';
-import {buildMatchupProfile,defensiveRankings} from '../matchup7.js?v=11';
-import {buildFeatureWarehouse,warehouseToMatchup,parseFeatureText,positionMatchupScore} from '../feature8.js?v=11';
-import {buildPlayerMatchupBoard,parsePlayerText,backtestMatchupFeature} from '../player9.js?v=11';
-import {buildOperationsReport,featureAblation,sourceHealth,freshnessGate,parseOpsText} from '../pipeline10.js?v=11';
+const app = document.querySelector('#app');
 
-const CACHE='nfl-lab-step10-features-v1', PCACHE='nfl-lab-step10-player-v1', OCACHE='nfl-lab-step10-ops-v1';
-const S={page:'Player Matchups',season:2026,data:null,props:[],defenses:[],offenses:[],warehouse:null,playerRows:[],playerBoard:[],loading:true,q:'',minScore:55,featureText:'',playerText:'',message:'',opsRows:[],opsReport:null};
-const app=document.querySelector('#app');
-const esc=x=>String(x??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
-const pct=x=>x==null?'—':`${(Number(x)*100).toFixed(1)}%`, nfmt=x=>x==null?'—':Number(x).toFixed(3);
-const pill=(x,c='info')=>`<span class="pill ${c}">${esc(x)}</span>`;
-function saved(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch{return null}} function persist(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
-function cm(){return new Map((S.data.board||[]).map(p=>[p.playerId,researchPlayer(p.playerId,S.data.stats.data,S.data.games.data,S.data.injuries.data)]))}
-function defense(team){return S.defenses.find(x=>(x.team||x.defteam)===team)||{}}
-function offense(team){return S.offenses.find(x=>(x.team||x.posteam)===team)||{}}
-function posAllow(team,pos){return (S.warehouse?.positionAllowed||[]).find(x=>x.team===team&&x.position===String(pos||'').toUpperCase())||{}}
-function playerBoard(){return S.playerBoard.length?S.playerBoard:buildPlayerMatchupBoard({players:S.playerRows,warehouse:S.warehouse||{},injuries:S.data?.injuries?.data||[],depth:S.data?.depth?.data||[],marketRows:S.props})}
-function predictions(){const m=cm();return S.props.map(p=>{const r=m.get(p.playerId)||{},e=evaluateProp(p,r), pb=playerBoard().find(x=>String(x.playerId)===String(p.playerId))||{}, d=defense(p.opponent), o=offense(p.team); const profile=buildMatchupProfile({defense:d,offense:o,weather:p.weather||{},spread:p.spread,total:p.total,player:pb,market:p.market}); const factor=profile.factor*(pb.matchupFactor||1), base=r.baseline?.[p.market]??r.season?.[p.market]??r.mean, adjusted=Number.isFinite(Number(base))?Number(base)*factor:null; const pred=buildPrediction({prop:{...p,...e},research:r,matchup:d,injuries:S.data.injuries.data||[],player:pb,calibrationRows:[]}); const gate=bestBetGate({...pred,projection:adjusted??pred.projection,edge:e.edge,matchupScore:pb.matchupScore||profile.score,quality:e.edge*7+e.confidence*.45,freshnessScore:1}); return {...gate,...p,playerMatchup:pb,matchupScore:pb.matchupScore||profile.score,projection:adjusted??pred.projection,notes:[...(pb.notes||[]),...(profile.notes||[])]};}).sort((a,b)=>b.matchupScore-a.matchupScore)}
-function head(k,t,s,action='Refresh research'){return `<div class="hero"><div><div class="eyebrow">${k}</div><h1>${t}</h1><div class="muted">${s}</div></div><button class="btn primary" id="refresh">${action}</button></div>`}
-function controls(){return `<div class="filters"><input id="query" class="control" placeholder="Player / team / position" value="${esc(S.q)}"><select id="minScore" class="control"><option value="50">50+</option><option value="55" ${S.minScore===55?'selected':''}>55+</option><option value="60">60+</option><option value="65">65+</option><option value="70">70+</option></select></div>`}
-function boardTable(rows){return `<div class="tablewrap"><table class="table"><thead><tr><th>Player</th><th>Pos</th><th>Matchup</th><th>Factor</th><th>Role confidence</th><th>Drivers</th></tr></thead><tbody>${rows.map(x=>`<tr><td><b>${esc(x.player)}</b><div class="sub">${esc(x.team)} vs ${esc(x.opponent)}</div></td><td>${esc(x.position)}</td><td><b>${Number(x.matchupScore||0).toFixed(0)}</b></td><td>${Number(x.matchupFactor||1).toFixed(3)}</td><td>${Number(x.confidence||0).toFixed(0)}</td><td class="why">${esc((x.notes||[]).join(' • ')||'Neutral')}</td></tr>`).join('')}</tbody></table>${!rows.length?'<div class="empty">No player-level matchup signal meets the current filter.</div>':''}</div>`}
-function board(){const rows=playerBoard().filter(x=>x.matchupScore>=S.minScore).filter(x=>`${x.player} ${x.team} ${x.opponent} ${x.position}`.toLowerCase().includes(S.q.toLowerCase()));return head('STEP 9 · PLAYER MATCHUP ENGINE','Player Matchups','Player usage, route/coverage history, opponent position allowances, pass-rush context, OL availability, and depth scenarios.')+`<div class="grid cards">${[['Players',playerBoard().length],['Qualified',rows.length],['OL contexts',playerBoard().filter(x=>x.ol?.available).length],['Coverage splits',playerBoard().reduce((s,x)=>s+(x.components?.routeCoverageSample||0),0)] .map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="num">${x[1]}</div></div>`).join('')}</div><div class="panel"><div class="panelhead"><h2>Player-level matchup board</h2>${controls()}</div>${boardTable(rows)}</div>`}
-function route(){const rows=S.playerRows.filter(x=>x.route&&x.coverage);return head('ROUTE / COVERAGE','Player Route × Coverage','Historical player route performance is joined to the defensive coverage structure when participation supplies both fields.')+`<div class="panel"><div class="tablewrap"><table class="table"><thead><tr><th>Player</th><th>Team</th><th>Route</th><th>Coverage</th><th>Targets</th><th>Catch rate</th><th>Yds/target</th></tr></thead><tbody>${rows.slice(0,500).map(x=>`<tr><td>${esc(x.player)}</td><td>${esc(x.team)}</td><td>${esc(x.route)}</td><td>${pill(x.coverage)}</td><td>${x.targets}</td><td>—</td><td>${x.targets?Number(x.receivingYards/x.targets).toFixed(1):'—'}</td></tr>`).join('')||'<tr><td colspan="7">No player route/coverage rows loaded.</td></tr>'}</tbody></table></div></div>`}
-function ol(){return head('OL vs PASS RUSH','Offensive Line / Pass-Rush','The player model explicitly separates defensive pressure from offensive-line availability instead of treating the defense alone as the matchup.')+`<div class="grid two">${playerBoard().slice(0,40).map(x=>`<div class="panel"><h2>${esc(x.player)} <span class="sub">${esc(x.team)}</span></h2><div class="metrics"><div><span>Matchup</span><b>${x.matchupScore.toFixed(0)}</b></div><div><span>OL confidence</span><b>${x.ol?.confidence?.toFixed(0)||0}</b></div><div><span>Pressure factor</span><b>${Number(x.components?.passRush?.factor||1).toFixed(3)}</b></div><div><span>Depth loss</span><b>${x.ol?.depthLoss||0}</b></div></div></div>`).join('')||'<div class="empty">No player/OL observations loaded.</div>'}</div>`}
-function scenarios(){return head('INJURY / DEPTH','Role Scenario Engine','Injury and depth-chart context changes the matchup factor conservatively; it never invents a replacement role without source data.')+`<div class="panel"><div class="tablewrap"><table class="table"><thead><tr><th>Player</th><th>Team</th><th>Position</th><th>Scenario factor</th><th>Confidence</th><th>Notes</th></tr></thead><tbody>${playerBoard().map(x=>`<tr><td>${esc(x.player)}</td><td>${esc(x.team)}</td><td>${esc(x.position)}</td><td>${Number(x.scenario?.factor||1).toFixed(3)}</td><td>${x.confidence.toFixed(0)}</td><td>${esc((x.scenario?.notes||[]).join(' • ')||'No scenario adjustment')}</td></tr>`).join('')||'<tr><td colspan="6">No player scenario rows.</td></tr>'}</tbody></table></div></div>`}
-function validation(){const rows=S.data?.matchupBacktest?.data||[];const b=backtestMatchupFeature(rows);return head('VALIDATION','Matchup Feature Backtest','Compare matchup-adjusted projections with baseline projections using only imported historical outcomes. No in-sample success claim is implied.')+`<div class="grid cards">${[['Rows',b.n],['Hit rate',b.hitRate==null?'—':pct(b.hitRate)],['MAE',b.mae==null?'—':b.mae.toFixed(2)],['Baseline MAE',b.baseMae==null?'—':b.baseMae.toFixed(2)],['Improvement',b.improvement==null?'—':b.improvement.toFixed(2)]].map(x=>`<div class="card"><div class="label">${x[0]}</div><div class="num">${x[1]}</div></div>`).join('')}</div><div class="panel"><h2>What this validates</h2><p class="muted">Import historical player-level projections/outcomes to test whether position allowances, route/coverage, pass-rush and OL features improve error versus the baseline. A feature should earn model weight only after out-of-sample testing.</p></div>`}
-function warehouse(){return head('DATA WAREHOUSE','Player Feature Import','Paste player-level participation, route/coverage, OL, or validation rows. Step 9 keeps raw observations separate from derived matchup scores.')+`<div class="panel"><h2>Player / participation import</h2><p class="muted">Accepted fields include player_id, player, team, opponent, position_group, game_id, week, route, defense_coverage_type, targets, receptions, receiving_yards, air_yards, routes, snaps, pressures, pass_block_snaps, sacks_allowed, ol_slot, ol_rank, actual, modelProjection, baseProjection.</p><textarea id="playerText" class="textarea" placeholder="Paste JSON array or CSV here">${esc(S.playerText)}</textarea><div class="actions"><button class="btn primary" id="buildPlayers">Build player matchup layer</button><button class="btn" id="clearPlayers">Clear player layer</button></div>${S.message?`<div class="notice">${esc(S.message)}</div>`:''}</div>`}
-function methodology(){return head('METHODOLOGY','Step 9 Architecture','Step 9 converts team-level matchup features into player-level context while preserving sample-size and provenance guardrails.')+`<div class="grid two"><div class="panel"><h2>Player layer</h2><ul><li>Player route/target/air-yard baselines with recency weighting</li><li>Route × coverage splits when participation supports them</li><li>Opponent QB/RB/WR/TE allowance joins</li><li>OL starter/depth context</li><li>Defensive pressure/blitz interaction</li><li>Injury and depth-chart scenario adjustments</li></ul></div><div class="panel"><h2>Validation guardrails</h2><ul><li>Small samples are shrunk toward league priors.</li><li>Missing participation fields remain missing.</li><li>Modifiers are capped.</li><li>Feature value is tested against a baseline before promotion.</li><li>A matchup signal alone never creates a bet.</li></ul></div></div>`}
+const esc = (x) => String(x ?? '').replace(/[&<>"']/g, m => ({
+  '&':'&amp;',
+  '<':'&lt;',
+  '>':'&gt;',
+  '"':'&quot;',
+  "'":'&#039;'
+}[m]));
 
-function operations(){const r=S.opsReport||buildOperationsReport({results:{season:S.season,players:S.data.players,playerStats:S.data.stats,stats:S.data.stats,injuries:S.data.injuries,depth:S.data.depth},warehouse:S.warehouse,playerBoard:playerBoard(),backtestRows:S.opsRows});S.opsReport=r;return head('STEP 10 · OPERATIONS','Production Readiness','Source freshness, snapshot governance, rolling out-of-sample validation, and feature ablation. A failed freshness gate never silently becomes a live edge.')+`<div class="grid cards">${[['Fresh sources',r.health.filter(x=>x.state==='FRESH').length],['Stale / missing',r.health.filter(x=>x.state!=='FRESH').length],['Ablation rows',S.opsRows.length],['Gate',r.gate.allow?'OPEN':'BLOCKED']].map((x,i)=>`<div class="card"><div class="label">${x[0]}</div><div class="num">${x[1]}</div></div>`).join('')}</div><div class="panel"><h2>Source health</h2>${r.health.map(x=>`<div class="source"><div><b>${esc(x.label)}</b><small>${esc(x.cadence)} · ${x.rows} rows${x.error?' · '+x.error:''}</small></div>${pill(x.state,x.state==='FRESH'?'ok':x.state==='STALE'?'warn':'bad')}</div>`).join('')}</div><div class="panel"><h2>Freshness gate</h2><div class="notice">${esc(r.gate.reason)}${r.gate.staleRequired.length?` · ${esc(r.gate.staleRequired.join(', '))}`:''}</div></div>`}
-function ablation(){const a=featureAblation(S.opsRows);return head('FEATURE ABLATION','Matchup Feature Value','Out-of-sample comparison of the baseline against incremental player matchup feature groups.')+`<div class="panel"><div class="tablewrap"><table class="table"><thead><tr><th>Feature set</th><th>N</th><th>MAE</th><th>RMSE</th><th>Improvement vs base</th></tr></thead><tbody>${a.map(x=>`<tr><td><b>${esc(x.feature)}</b></td><td>${x.n}</td><td>${x.mae==null?'—':x.mae.toFixed(3)}</td><td>${x.rmse==null?'—':x.rmse.toFixed(3)}</td><td>${x.improvementVsBase==null?'—':x.improvementVsBase.toFixed(3)}</td></tr>`).join('')}</tbody></table></div></div><div class="panel"><p class="muted">Positive improvement means lower absolute error than the baseline. This table is descriptive until the imported rows are strictly out-of-sample and timestamped before outcomes.</p></div>`}
-function snapshots(){const r=S.opsReport||buildOperationsReport({results:{season:S.season,players:S.data.players,playerStats:S.data.stats,stats:S.data.stats,injuries:S.data.injuries,depth:S.data.depth},warehouse:S.warehouse,playerBoard:playerBoard(),backtestRows:S.opsRows});return head('SNAPSHOTS','Research Snapshot','A reproducible snapshot records source health, counts, warehouse version, and player-profile count before a model run.')+`<div class="panel"><pre class="mono">${esc(JSON.stringify(r.snapshot,null,2))}</pre></div>`}
-function opsImport(){return head('VALIDATION IMPORT','Operations Data','Import timestamped historical projections/outcomes to run feature ablation and rolling validation. No imported result is treated as live data.')+`<div class="panel"><textarea id="opsText" class="textarea" placeholder="JSON or CSV: week,actual,baseProjection,positionProjection,routeCoverageProjection,passRushProjection,olProjection,scenarioProjection,fullProjection">${esc(S.opsText||'')}</textarea><div class="actions"><button class="btn primary" id="buildOps">Run validation</button><button class="btn" id="clearOps">Clear</button></div><div class="notice">Recommended fields: week, playerId, actual, baseProjection, positionProjection, routeCoverageProjection, passRushProjection, olProjection, scenarioProjection, fullProjection. Keep only pre-outcome predictions for honest OOS testing.</div></div>`}
-function body(){if(S.loading)return `<div class="empty"><div class="spinner"></div><h2>Loading Step 9…</h2></div>`;if(!S.data)return `<div class="empty">Research unavailable. <button class="btn primary" id="refresh">Retry</button></div>`;return ({'Player Matchups':board,'Route × Coverage':route,'OL vs Pass Rush':ol,'Injury & Depth':scenarios,'Validation':validation,'Feature Warehouse':warehouse,'Operations':operations,'Feature Ablation':ablation,'Snapshots':snapshots,'Validation Import':opsImport,'Methodology':methodology}[S.page]||board)()}
-function render(){app.innerHTML=`<header class="topbar"><div class="brand">NFL <span>RESEARCH LAB</span></div><div class="status"><i class="dot"></i> Step 9 · Player matchup engine</div></header><div class="layout"><aside><div class="label navtitle">PLAYER MATCHUP ENGINE</div>${['Player Matchups','Route × Coverage','OL vs Pass Rush','Injury & Depth','Validation','Feature Warehouse','Operations','Feature Ablation','Snapshots','Validation Import','Methodology'].map(x=>`<button class="navbtn ${S.page===x?'active':''}" data-nav="${x}">${x}</button>`).join('')}<div class="footer">Step 9 · Player-level modeling</div></aside><main class="main">${body()}</main></div>`;document.querySelectorAll('[data-nav]').forEach(b=>b.onclick=()=>{S.page=b.dataset.nav;render()});document.querySelector('#refresh')?.addEventListener('click',load);document.querySelector('#query')?.addEventListener('input',e=>{S.q=e.target.value;render()});document.querySelector('#minScore')?.addEventListener('change',e=>{S.minScore=+e.target.value;render()});document.querySelector('#buildPlayers')?.addEventListener('click',buildPlayers);document.querySelector('#clearPlayers')?.addEventListener('click',clearPlayers);document.querySelector('#buildOps')?.addEventListener('click',buildOps);document.querySelector('#clearOps')?.addEventListener('click',clearOps)}
-function buildPlayers(){const text=document.querySelector('#playerText')?.value||'';const rows=parsePlayerText(text);if(!rows.length){S.message='No player rows parsed. Provide JSON or CSV with the documented fields.';render();return}S.playerRows=rows;S.playerBoard=buildPlayerMatchupBoard({players:rows,warehouse:S.warehouse||{},injuries:S.data.injuries.data||[],depth:S.data.depth?.data||[],marketRows:S.props});persist(PCACHE,{rows,board:S.playerBoard});S.playerText=text;S.message=`Built ${S.playerBoard.length} player profiles from ${rows.length} observations.`;render()}
-function buildOps(){const text=document.querySelector('#opsText')?.value||'';const rows=parseOpsText(text);if(!rows.length){S.message='No validation rows parsed.';render();return}S.opsRows=rows;S.opsText=text;S.opsReport=buildOperationsReport({results:{season:S.season,players:S.data.players,playerStats:S.data.stats,stats:S.data.stats,injuries:S.data.injuries,depth:S.data.depth},warehouse:S.warehouse,playerBoard:playerBoard(),backtestRows:rows});persist(OCACHE,{rows,report:S.opsReport});S.message=`Loaded ${rows.length} historical validation rows.`;render()}
-function clearOps(){try{localStorage.removeItem(OCACHE)}catch{}S.opsRows=[];S.opsReport=null;S.opsText='';S.message='Validation import cleared.';render()}
-function clearPlayers(){try{localStorage.removeItem(PCACHE)}catch{}S.playerRows=[];S.playerBoard=[];S.message='Local player matchup layer cleared.';render()}
-async function load(){S.loading=true;render();try{S.data=await loadResearch(S.season);const w=saved(CACHE);if(w){S.warehouse=w;const mapped=warehouseToMatchup(w);S.defenses=mapped.defenses;S.offenses=mapped.offenses}const p=saved(PCACHE);if(p){S.playerRows=p.rows||[];S.playerBoard=p.board||[]} const o=saved(OCACHE);if(o){S.opsRows=o.rows||[];S.opsReport=o.report||null} }catch(e){S.data=null}S.loading=false;render()}
-render();load();
+const num = (x) => Number(x || 0);
+
+const fmt = (x) =>
+  Number.isFinite(Number(x)) ? Number(x).toFixed(1) : '—';
+
+const S = {
+  season: 2026,
+  data: null,
+  research: null,
+  advanced: {},
+  loading: true,
+  error: ''
+};
+
+
+/* -----------------------------
+   BASIC PAGE
+----------------------------- */
+
+function renderShell() {
+  app.innerHTML = `
+    <main class="page">
+
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">NFL RESEARCH LAB</div>
+          <h1>Research Dashboard</h1>
+          <p class="muted">
+            Step 11 · Live data loading layer
+          </p>
+        </div>
+
+        <button id="refresh">
+          Refresh research
+        </button>
+      </header>
+
+      <section id="content"></section>
+
+    </main>
+  `;
+
+  document
+    .querySelector('#refresh')
+    ?.addEventListener('click', load);
+}
+
+
+function renderLoading(message = 'Loading NFL research data…') {
+  const el = document.querySelector('#content');
+
+  if (!el) return;
+
+  el.innerHTML = `
+    <section class="card">
+
+      <div class="spinner"></div>
+
+      <h2>${esc(message)}</h2>
+
+      <p class="muted">
+        Connecting to the normalized NFL data sources.
+      </p>
+
+    </section>
+  `;
+}
+
+
+function renderError(message) {
+  const el = document.querySelector('#content');
+
+  if (!el) return;
+
+  el.innerHTML = `
+    <section class="card error-card">
+
+      <h2>Research could not start</h2>
+
+      <p>${esc(message)}</p>
+
+      <p class="muted">
+        The page itself is working.
+        Tap “Refresh research” to try again.
+      </p>
+
+      <details>
+        <summary>Technical detail</summary>
+        <pre>${esc(message)}</pre>
+      </details>
+
+    </section>
+  `;
+}
+
+
+/* -----------------------------
+   SOURCE STATUS
+----------------------------- */
+
+function sourceBadge(source) {
+  const state = source?.state || 'Unavailable';
+
+  const lower = state.toLowerCase();
+
+  const cls =
+    lower.includes('live')
+      ? 'good'
+      : lower.includes('fallback') || lower.includes('cached')
+        ? 'warn'
+        : 'bad';
+
+  return `
+    <span class="badge ${cls}">
+      ${esc(state)}
+    </span>
+  `;
+}
+
+
+/* -----------------------------
+   DASHBOARD
+----------------------------- */
+
+function renderDashboard() {
+  const el = document.querySelector('#content');
+
+  if (!el) return;
+
+  const d = S.data || {};
+
+  const counts = d.meta?.counts || {};
+  const sources = d.meta?.sources || {};
+
+  const board = Array.isArray(d.board)
+    ? d.board
+    : [];
+
+  const stats = d.stats?.data || [];
+  const players = d.players?.data || [];
+  const injuries = d.injuries?.data || [];
+  const games = d.games?.data || [];
+  const depth = d.depth?.data || [];
+  const rosters = d.rosters?.data || [];
+
+  const top = [...board]
+    .sort(
+      (a, b) =>
+        (num(b.targets) + num(b.carries)) -
+        (num(a.targets) + num(a.carries))
+    )
+    .slice(0, 25);
+
+  el.innerHTML = `
+
+    <section class="grid stats-grid">
+
+      ${[
+        ['Players', players.length || counts.players || 0],
+        ['Stat rows', stats.length || counts.stats || 0],
+        ['Games', games.length || counts.games || 0],
+        ['Injuries', injuries.length || counts.injuries || 0],
+        ['Depth rows', depth.length || counts.depth || 0],
+        ['Roster rows', rosters.length || counts.rosters || 0]
+      ]
+        .map(
+          ([label, value]) => `
+            <div class="card stat">
+
+              <div class="label">
+                ${esc(label)}
+              </div>
+
+              <div class="value">
+                ${value}
+              </div>
+
+            </div>
+          `
+        )
+        .join('')}
+
+    </section>
+
+
+    <section class="card">
+
+      <div class="section-head">
+
+        <div>
+          <div class="eyebrow">
+            DATA STATUS
+          </div>
+
+          <h2>
+            Source health
+          </h2>
+        </div>
+
+        <div class="muted">
+          Season requested:
+          ${esc(S.season)}
+          ·
+          Data season:
+          ${esc(d.seasonUsed || S.season)}
+        </div>
+
+      </div>
+
+
+      <div class="source-grid">
+
+        ${
+          Object.entries(sources)
+            .map(
+              ([key, source]) => `
+                <div class="source">
+
+                  <div>
+                    <strong>
+                      ${esc(key)}
+                    </strong>
+                  </div>
+
+                  <div>
+                    ${sourceBadge(source)}
+                  </div>
+
+                  <small>
+                    ${esc(
+                      source?.message ||
+                      source?.error ||
+                      source?.updatedAt ||
+                      ''
+                    )}
+                  </small>
+
+                </div>
+              `
+            )
+            .join('')
+          ||
+          '<div class="muted">No source metadata returned.</div>'
+        }
+
+      </div>
+
+
+      ${
+        d.meta?.statsFallback
+          ? `
+            <div class="notice">
+              Player statistics are using a fallback season
+              because the requested season's stats feed
+              was unavailable.
+            </div>
+          `
+          : ''
+      }
+
+    </section>
+
+
+    <section class="card">
+
+      <div class="section-head">
+
+        <div>
+          <div class="eyebrow">
+            RESEARCH BOARD
+          </div>
+
+          <h2>
+            Player usage leaders
+          </h2>
+        </div>
+
+        <div class="muted">
+          ${board.length}
+          players with normalized stat data
+        </div>
+
+      </div>
+
+
+      ${
+        top.length
+          ? `
+            <div class="table-wrap">
+
+              <table>
+
+                <thead>
+
+                  <tr>
+                    <th>Player</th>
+                    <th>Team</th>
+                    <th>Pos</th>
+                    <th>Games</th>
+                    <th>Targets/G</th>
+                    <th>Carries/G</th>
+                    <th>Rec Yds/G</th>
+                    <th>Rush Yds/G</th>
+                  </tr>
+
+                </thead>
+
+                <tbody>
+
+                  ${top
+                    .map(
+                      p => `
+                        <tr>
+
+                          <td>
+                            <strong>
+                              ${esc(p.player)}
+                            </strong>
+                          </td>
+
+                          <td>
+                            ${esc(p.team)}
+                          </td>
+
+                          <td>
+                            ${esc(p.position)}
+                          </td>
+
+                          <td>
+                            ${esc(p.games)}
+                          </td>
+
+                          <td>
+                            ${fmt(p.targetsG)}
+                          </td>
+
+                          <td>
+                            ${fmt(p.carriesG)}
+                          </td>
+
+                          <td>
+                            ${fmt(p.recYdsG)}
+                          </td>
+
+                          <td>
+                            ${fmt(p.rushYdsG)}
+                          </td>
+
+                        </tr>
+                      `
+                    )
+                    .join('')}
+
+                </tbody>
+
+              </table>
+
+            </div>
+          `
+          : `
+            <div class="empty">
+
+              <h3>
+                No player statistics loaded yet
+              </h3>
+
+              <p class="muted">
+                The data layer returned successfully,
+                but there are no normalized player stat
+                rows for this season.
+              </p>
+
+            </div>
+          `
+      }
+
+    </section>
+
+
+    <section class="card">
+
+      <div class="section-head">
+
+        <div>
+          <div class="eyebrow">
+            ENGINE STATUS
+          </div>
+
+          <h2>
+            Research modules
+          </h2>
+        </div>
+
+      </div>
+
+
+      <div class="module-list">
+
+        <div>
+          <span class="badge good">
+            READY
+          </span>
+
+          Core data + research layer
+        </div>
+
+
+        <div>
+
+          <span class="badge ${
+            S.advanced.edge ? 'good' : 'warn'
+          }">
+
+            ${S.advanced.edge ? 'READY' : 'OPTIONAL'}
+
+          </span>
+
+          Market / edge engine
+
+        </div>
+
+
+        <div>
+
+          <span class="badge ${
+            S.advanced.model ? 'good' : 'warn'
+          }">
+
+            ${S.advanced.model ? 'READY' : 'OPTIONAL'}
+
+          </span>
+
+          Prediction engine
+
+        </div>
+
+
+        <div>
+
+          <span class="badge ${
+            S.advanced.matchup ? 'good' : 'warn'
+          }">
+
+            ${S.advanced.matchup ? 'READY' : 'OPTIONAL'}
+
+          </span>
+
+          Matchup engine
+
+        </div>
+
+
+        <div>
+
+          <span class="badge ${
+            S.advanced.pipeline ? 'good' : 'warn'
+          }">
+
+            ${S.advanced.pipeline ? 'READY' : 'OPTIONAL'}
+
+          </span>
+
+          Operations / validation
+
+        </div>
+
+      </div>
+
+    </section>
+  `;
+}
+
+
+/* -----------------------------
+   ADVANCED MODULES
+----------------------------- */
+
+/*
+  IMPORTANT:
+  These are dynamically imported.
+
+  If one of the older Step 4–10 modules
+  has a browser error, it will NOT prevent
+  the basic application from loading.
+*/
+
+async function loadAdvancedModules() {
+
+  const modules = [
+
+    ['edge', './edge.js?v=12'],
+
+    ['model', './model6.js?v=12'],
+
+    ['matchup', '../matchup7.js?v=12'],
+
+    ['feature', '../feature8.js?v=12'],
+
+    ['player', '../player9.js?v=12'],
+
+    ['pipeline', '../pipeline10.js?v=12']
+
+  ];
+
+
+  for (const [name, path] of modules) {
+
+    try {
+
+      S.advanced[name] =
+        await import(path);
+
+    } catch (error) {
+
+      console.warn(
+        `Optional module failed: ${name}`,
+        error
+      );
+
+      S.advanced[name] = null;
+    }
+  }
+}
+
+
+/* -----------------------------
+   MAIN LOADER
+----------------------------- */
+
+async function load() {
+
+  S.loading = true;
+  S.error = '';
+
+  renderLoading();
+
+
+  try {
+
+    /*
+      Only load research.js after the
+      page itself is already running.
+    */
+
+    const researchModule =
+      await import('./research.js?v=12');
+
+
+    S.research = researchModule;
+
+
+    if (
+      typeof researchModule.loadResearch !==
+      'function'
+    ) {
+
+      throw new Error(
+        'research.js loaded, but loadResearch was not exported.'
+      );
+    }
+
+
+    S.data =
+      await researchModule.loadResearch(
+        S.season
+      );
+
+
+    /*
+      Render the basic dashboard FIRST.
+      This guarantees that advanced modules
+      cannot make the whole page blank.
+    */
+
+    renderDashboard();
+
+
+    /*
+      Now load the advanced engines.
+    */
+
+    await loadAdvancedModules();
+
+
+    /*
+      Refresh engine-status indicators.
+    */
+
+    renderDashboard();
+
+
+  } catch (error) {
+
+    console.error(error);
+
+    S.error =
+      error?.stack ||
+      error?.message ||
+      String(error);
+
+    renderError(S.error);
+
+
+  } finally {
+
+    S.loading = false;
+
+  }
+}
+
+
+/* -----------------------------
+   FALLBACK STYLES
+----------------------------- */
+
+function installBaseStyles() {
+
+  if (
+    document.querySelector(
+      '#step11-safe-styles'
+    )
+  ) {
+    return;
+  }
+
+
+  const style =
+    document.createElement('style');
+
+
+  style.id =
+    'step11-safe-styles';
+
+
+  style.textContent = `
+
+    body {
+      margin: 0;
+      background: #07101c;
+      color: #e8eef7;
+      font-family:
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Roboto,
+        sans-serif;
+    }
+
+
+    .page {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      align-items: flex-start;
+      margin-bottom: 24px;
+    }
+
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin-top: 0;
+    }
+
+
+    h1 {
+      margin-bottom: 6px;
+      font-size: 32px;
+    }
+
+
+    h2 {
+      margin-bottom: 6px;
+    }
+
+
+    .eyebrow {
+      font-size: 11px;
+      letter-spacing: .14em;
+      opacity: .7;
+      font-weight: 800;
+    }
+
+
+    .muted {
+      color: #9aa9bd;
+    }
+
+
+    button {
+      border: 0;
+      border-radius: 10px;
+      padding: 11px 16px;
+      font-weight: 800;
+      cursor: pointer;
+      background: #fff;
+      color: #07101c;
+    }
+
+
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+
+    .stats-grid {
+      grid-template-columns:
+        repeat(6, minmax(0, 1fr));
+      margin-bottom: 16px;
+    }
+
+
+    .card {
+      background: #0d1827;
+      border: 1px solid #22344a;
+      border-radius: 14px;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+
+
+    .stat .label {
+      color: #9aa9bd;
+      font-size: 12px;
+    }
+
+
+    .stat .value {
+      font-size: 28px;
+      font-weight: 850;
+      margin-top: 5px;
+    }
+
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+
+    .source-grid {
+      display: grid;
+      grid-template-columns:
+        repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+
+    .source {
+      background: #091321;
+      border: 1px solid #1d2b3d;
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+
+    .source small {
+      display: block;
+      color: #8191a7;
+      margin-top: 7px;
+      overflow-wrap: anywhere;
+    }
+
+
+    .badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      padding: 4px 7px;
+      border-radius: 999px;
+      background: #273449;
+      color: #dce6f4;
+    }
+
+
+    .badge.good {
+      background: #173b2c;
+      color: #7ee2a8;
+    }
+
+
+    .badge.warn {
+      background: #493916;
+      color: #f3cf76;
+    }
+
+
+    .badge.bad {
+      background: #4a2025;
+      color: #ff9a9a;
+    }
+
+
+    .notice {
+      margin-top: 14px;
+      padding: 11px 13px;
+      border-radius: 9px;
+      background: #332c18;
+      color: #f2d77d;
+    }
+
+
+    .table-wrap {
+      overflow: auto;
+    }
+
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+
+    th,
+    td {
+      text-align: left;
+      padding: 10px 8px;
+      border-bottom: 1px solid #203047;
+      white-space: nowrap;
+    }
+
+
+    th {
+      color: #91a1b6;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+
+    td {
+      font-size: 13px;
+    }
+
+
+    .module-list {
+      display: grid;
+      gap: 10px;
+    }
+
+
+    .module-list > div {
+      padding: 10px 0;
+      border-bottom: 1px solid #1d2b3d;
+      display: flex;
+      gap: 9px;
+      align-items: center;
+    }
+
+
+    .empty {
+      padding: 20px 0;
+    }
+
+
+    .error-card {
+      border-color: #6b2a34;
+    }
+
+
+    details {
+      margin-top: 14px;
+    }
+
+
+    pre {
+      white-space: pre-wrap;
+      overflow: auto;
+      color: #ffb2b2;
+      font-size: 11px;
+    }
+
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid #34445a;
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin-bottom: 14px;
+    }
+
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+
+    @media (max-width: 900px) {
+
+      .stats-grid {
+        grid-template-columns:
+          repeat(3, minmax(0, 1fr));
+      }
+
+      .source-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar,
+      .section-head {
+        flex-direction: column;
+      }
+    }
+
+
+    @media (max-width: 560px) {
+
+      .page {
+        padding: 14px;
+      }
+
+      .stats-grid {
+        grid-template-columns:
+          repeat(2, minmax(0, 1fr));
+      }
+
+      h1 {
+        font-size: 26px;
+      }
+    }
+
+  `;
+
+
+  document.head.appendChild(style);
+}
+
+
+/* -----------------------------
+   START
+----------------------------- */
+
+installBaseStyles();
+
+renderShell();
+
+load();
