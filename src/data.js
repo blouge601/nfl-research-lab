@@ -16,7 +16,7 @@ const CACHE = 'nfl-lab-data-v5';
 const RELEASE_CACHE = 'nfl-lab-release-assets-v2';
 const CACHE_TTL_MS = 1000 * 60 * 60 * 12;
 
-const LOCAL_DATA_BASE = './data/nfl';
+const LOCAL_DATA_BASE = new URL('./data/nfl/', document.baseURI).href.replace(/\/$/, '');
 
 const GH_API = 'https://api.github.com';
 const GH_REPO = 'nflverse/nflverse-data';
