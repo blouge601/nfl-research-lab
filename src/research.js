@@ -1,604 +1,73 @@
-import {
-  fetchSeasonGames,
-  fetchSeasonStats,
-  fetchPlayers,
-  fetchInjuries,
-  fetchRosters
-} from './data.js?v=15';
 
-const avg = a =>
-  a.length
-    ? a.reduce((x, y) => x + y, 0) / a.length
-    : 0;
+import {fetchSeasonGames,fetchSeasonStats,fetchPlayers,fetchInjuries,fetchDepthCharts,fetchRosters} from './data.js';
+const n=(x,d=0)=>Number.isFinite(Number(x))?Number(x):d;
+const avg=a=>a.length?a.reduce((s,x)=>s+x,0)/a.length:0;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const key=x=>String(x??'').trim().toUpperCase();
 
-const clamp = (n, a, b) =>
-  Math.max(a, Math.min(b, n));
-
-
-/* =========================================================
-   PLAYER ROWS
-========================================================= */
-
-export function buildPlayerRows(stats = []) {
-  const map = new Map();
-
-  for (const s of stats) {
-    const id =
-      s.playerId ||
-      s.player;
-
-    if (!map.has(id)) {
-      map.set(id, []);
-    }
-
-    map.get(id).push(s);
-  }
-
-  return [...map].map(([id, rows]) => {
-    const games =
-      rows.length || 1;
-
-    const sum = key =>
-      rows.reduce(
-        (total, row) =>
-          total + Number(row[key] || 0),
-        0
-      );
-
-    const targets =
-      sum('targets');
-
-    const carries =
-      sum('carries');
-
-    const receptions =
-      sum('receptions');
-
-    const recYds =
-      sum('recYds');
-
-    const rushYds =
-      sum('rushYds');
-
-    const passYds =
-      sum('passYds');
-
-    const snaps =
-      sum('snaps');
-
-    const routes =
-      sum('routes');
-
-    const tds =
-      sum('passTD') +
-      sum('rushTD') +
-      sum('recTD');
-
-    const p =
-      rows[rows.length - 1] || {};
-
-    return {
-      playerId: id,
-
-      player:
-        p.player ||
-        'Unknown',
-
-      team:
-        p.team ||
-        '',
-
-      position:
-        p.position ||
-        '',
-
-      games,
-
-      targets,
-      carries,
-      receptions,
-
-      recYds,
-      rushYds,
-      passYds,
-
-      tds,
-
-      targetsG:
-        targets / games,
-
-      carriesG:
-        carries / games,
-
-      receptionsG:
-        receptions / games,
-
-      recYdsG:
-        recYds / games,
-
-      rushYdsG:
-        rushYds / games,
-
-      passYdsG:
-        passYds / games,
-
-      snaps,
-
-      snapsG:
-        snaps / games,
-
-      routes,
-
-      routesG:
-        routes / games
-    };
-  });
+export function buildPlayerRows(stats=[]){
+ const m=new Map();
+ for(const s of stats){const id=s.playerId||s.player;if(!id)continue;if(!m.has(id))m.set(id,[]);m.get(id).push(s)}
+ return [...m].map(([id,r])=>{
+  const sum=k=>r.reduce((a,x)=>a+n(x[k]),0), games=new Set(r.map(x=>x.week).filter(Boolean)).size||r.length||1;
+  const p=r[r.length-1]||{};
+  const targets=sum('targets'),carries=sum('carries'),rec=sum('receptions'),ry=sum('recYds'),rsh=sum('rushYds'),py=sum('passYds'),sn=sum('snaps'),routes=sum('routes');
+  return {playerId:id,player:p.player||'Unknown',team:p.team||'',position:p.position||'',games,targets,carries,receptions:rec,recYds:ry,rushYds:rsh,passYds:py,snaps:sn,routes,
+   tds:sum('passTD')+sum('rushTD')+sum('recTD'),targetsG:targets/games,carriesG:carries/games,receptionsG:rec/games,recYdsG:ry/games,rushYdsG:rsh/games,passYdsG:py/games,
+   snapsG:sn/games,routesG:routes/games,tdsG:(sum('passTD')+sum('rushTD')+sum('recTD'))/games,lastWeek:Math.max(...r.map(x=>x.week||0))}
+ })
 }
-
-
-/* =========================================================
-   TREND
-========================================================= */
-
-const trend = values => {
-  if (values.length < 3) {
-    return 'INSUFFICIENT';
-  }
-
-  const midpoint =
-    Math.floor(values.length / 2);
-
-  const early =
-    avg(values.slice(0, midpoint));
-
-  const recent =
-    avg(values.slice(midpoint));
-
-  const threshold =
-    Math.max(
-      0.5,
-      Math.abs(early) * 0.08
-    );
-
-  if (
-    recent >
-    early + threshold
-  ) {
-    return 'UP';
-  }
-
-  if (
-    recent <
-    early - threshold
-  ) {
-    return 'DOWN';
-  }
-
-  return 'FLAT';
-};
-
-
-/* =========================================================
-   INDIVIDUAL PLAYER RESEARCH
-========================================================= */
-
-export function researchPlayer(
-  id,
-  stats = [],
-  games = [],
-  injuries = []
-) {
-  const rows =
-    stats.filter(
-      x => x.playerId === id
-    );
-
-  if (!rows.length) {
-    return null;
-  }
-
-  const p =
-    buildPlayerRows(rows)[0];
-
-  const recent =
-    rows.slice(-5);
-
-  const role =
-    clamp(
-      p.targetsG +
-        p.carriesG * 0.65,
-      0,
-      25
-    );
-
-  const targetTrend =
-    trend(
-      recent.map(
-        x => Number(x.targets || 0)
-      )
-    );
-
-  const rushTrend =
-    trend(
-      recent.map(
-        x => Number(x.rushYds || 0)
-      )
-    );
-
-  const recTrend =
-    trend(
-      recent.map(
-        x => Number(x.recYds || 0)
-      )
-    );
-
-  const injury =
-    injuries.find(
-      x =>
-        x.playerId === id ||
-        (
-          x.player === p.player &&
-          x.team === p.team
-        )
-    );
-
-  const signals = [];
-
-  if (p.targetsG >= 6) {
-    signals.push([
-      'USAGE',
-      'High target volume',
-      `${p.targetsG.toFixed(1)} tgt/g`
-    ]);
-  }
-
-  if (p.carriesG >= 10) {
-    signals.push([
-      'USAGE',
-      'Meaningful rushing workload',
-      `${p.carriesG.toFixed(1)} car/g`
-    ]);
-  }
-
-  if (targetTrend === 'UP') {
-    signals.push([
-      'TREND',
-      'Target volume rising',
-      'Recent > early'
-    ]);
-  }
-
-  if (targetTrend === 'DOWN') {
-    signals.push([
-      'TREND',
-      'Target volume falling',
-      'Recent < early'
-    ]);
-  }
-
-  if (rushTrend === 'UP') {
-    signals.push([
-      'TREND',
-      'Rushing production rising',
-      'Recent > early'
-    ]);
-  }
-
-  if (recTrend === 'UP') {
-    signals.push([
-      'TREND',
-      'Receiving production rising',
-      'Recent > early'
-    ]);
-  }
-
-  if (
-    injury &&
-    /out|doubtful|inactive/i.test(
-      injury.gameStatus || ''
-    )
-  ) {
-    signals.push([
-      'AVAILABILITY',
-      'Availability concern',
-      injury.gameStatus
-    ]);
-  }
-
-  const confidence =
-    clamp(
-      35 +
-        rows.length * 8 +
-        (rows.length >= 5 ? 15 : 0),
-      0,
-      95
-    );
-
-  return {
-    p,
-    recent,
-    role,
-    targetTrend,
-    rushTrend,
-    recTrend,
-    confidence,
-    signals,
-    injury,
-
-    opponents:
-      games
-        .filter(
-          g =>
-            g.home === p.team ||
-            g.away === p.team
-        )
-        .slice(-5)
-        .map(
-          g =>
-            g.home === p.team
-              ? g.away
-              : g.home
-        )
-  };
+export function buildBoard(stats=[]){return buildPlayerRows(stats).sort((a,b)=>(b.targets+b.carries)-(a.targets+a.carries))}
+export function playerTier(p){const u=p.targetsG+p.carriesG;return u>=22?'ELITE':u>=16?'STAR':u>=10?'STARTER':u>=5?'ROLE':'DEPTH'}
+export function recentRows(stats=[],playerId,weeks=4){
+ const max=Math.max(...stats.map(x=>x.week||0),0);return stats.filter(x=>(x.playerId===playerId)&&(max-(x.week||0)<weeks))
 }
-
-
-/* =========================================================
-   RESEARCH BOARD
-========================================================= */
-
-export function buildBoard(
-  stats,
-  games,
-  injuries
-) {
-  return buildPlayerRows(
-    stats
-  )
-    .map(p => {
-      const r =
-        researchPlayer(
-          p.playerId,
-          stats,
-          games,
-          injuries
-        );
-
-      return {
-        ...p,
-
-        role:
-          r?.role || 0,
-
-        confidence:
-          r?.confidence || 0,
-
-        signals:
-          r?.signals?.length || 0,
-
-        targetTrend:
-          r?.targetTrend ||
-          'INSUFFICIENT'
-      };
-    })
-
-    .sort(
-      (a, b) =>
-        (
-          b.role +
-          b.signals * 2
-        ) -
-        (
-          a.role +
-          a.signals * 2
-        )
-    );
+export function summarizePlayer(p,stats){
+ const rr=recentRows(stats,p.playerId,4),games=rr.length||1;
+ return {...p,recentGames:rr.length,recentTargetsG:rr.reduce((s,x)=>s+n(x.targets),0)/games,recentCarriesG:rr.reduce((s,x)=>s+n(x.carries),0)/games,
+  recentRecYdsG:rr.reduce((s,x)=>s+n(x.recYds),0)/games,recentRushYdsG:rr.reduce((s,x)=>s+n(x.rushYds),0)/games}
 }
-
-
-/* =========================================================
-   RESEARCH LOADER
-========================================================= */
-
-export async function loadResearch(
-  season
-) {
-  /*
-   * IMPORTANT:
-   *
-   * Do NOT load the 58 MB depth-chart CSV
-   * on the phone during initial startup.
-   *
-   * The core research dataset consists of:
-   * games
-   * players
-   * player stats
-   * injuries
-   * rosters
-   *
-   * Depth charts will be added through a
-   * lighter optimized layer later.
-   */
-
-  const [
-    games,
-    players,
-    stats,
-    injuries,
-    rosters
-  ] = await Promise.all([
-    fetchSeasonGames(season),
-    fetchPlayers(),
-    fetchSeasonStats(season),
-    fetchInjuries(season),
-    fetchRosters(season)
-  ]);
-
-
-  /*
-   * Build unified player identity map.
-   */
-
-  const playerMap =
-    new Map();
-
-  for (
-    const p of players.data || []
-  ) {
-    if (p.id) {
-      playerMap.set(
-        p.id,
-        p
-      );
-    }
-  }
-
-  for (
-    const r of rosters.data || []
-  ) {
-    if (
-      r.id &&
-      !playerMap.has(r.id)
-    ) {
-      playerMap.set(
-        r.id,
-        r
-      );
-    }
-  }
-
-
-  const playerData =
-    [...playerMap.values()];
-
-
-  const statsData =
-    stats.data || [];
-
-
-  const gamesData =
-    games.data || [];
-
-
-  const injuryData =
-    injuries.data || [];
-
-
-  const rosterData =
-    rosters.data || [];
-
-
-  /*
-   * Build research board.
-   */
-
-  const board =
-    buildBoard(
-      statsData,
-      gamesData,
-      injuryData
-    );
-
-
-  /*
-   * Depth charts are intentionally deferred.
-   *
-   * This object keeps the existing app contract
-   * intact without forcing a 58 MB parse on mobile.
-   */
-
-  const depth = {
-    data: [],
-
-    live: false,
-
-    stale: false,
-
-    fallback: false,
-
-    source:
-      'nflverse depth charts',
-
-    updatedAt:
-      new Date().toISOString(),
-
-    error:
-      'Depth charts deferred from initial mobile load'
-  };
-
-
-  /*
-   * Return complete normalized research state.
-   */
-
-  return {
-    season,
-
-    seasonUsed:
-      stats.seasonUsed ||
-      season,
-
-    games,
-
-    players: {
-      ...players,
-      data: playerData
-    },
-
-    stats,
-
-    playerStats:
-      stats,
-
-    injuries,
-
-    depth,
-
-    rosters,
-
-    board,
-
-    meta: {
-
-      statsFallback:
-        !!stats.fallback,
-
-      /*
-       * IMPORTANT:
-       * Pass the complete source objects,
-       * not just source-name strings.
-       * The dashboard uses these objects to
-       * display real errors/status.
-       */
-
-      sources: {
-        games,
-        players,
-        stats,
-        injuries,
-        depth,
-        rosters
-      },
-
-      counts: {
-        games:
-          gamesData.length,
-
-        players:
-          playerData.length,
-
-        stats:
-          statsData.length,
-
-        injuries:
-          injuryData.length,
-
-        depth:
-          0,
-
-        rosters:
-          rosterData.length
-      }
-    }
-  };
+export function buildMatchups(board,games,injuries,depth){
+ const byTeam=new Map(board.map(x=>[key(x.team),x]));
+ const latest=new Map();
+ for(const g of games){if(!g.home||!g.away)continue;latest.set(g.home,{opponent:g.away,home:true,game:g});latest.set(g.away,{opponent:g.home,home:false,game:g})}
+ return board.map(p=>{
+  const x=latest.get(key(p.team));const d=(depth||[]).filter(z=>z.playerId===p.playerId).sort((a,b)=>(a.rank||99)-(b.rank||99))[0];
+  const inj=(injuries||[]).filter(z=>z.playerId===p.playerId).sort((a,b)=>(b.week||0)-(a.week||0))[0];
+  const opp=key(x?.opponent);const position=p.position||'';
+  let factor=1,notes=[];
+  if(['WR','TE'].includes(position))factor*=1.02;
+  if(position==='RB')factor*=1.00;
+  if(position==='QB')factor*=1.00;
+  if(d?.rank===1)notes.push('top depth-chart slot'); if(d?.rank>1)notes.push(`depth rank ${d.rank}`);
+  const status=String(inj?.gameStatus||'').toUpperCase(); if(/OUT|IR|DOUBTFUL/.test(status)){factor*=.97;notes.push(`availability: ${status}`)}
+  if(/QUESTIONABLE|LIMITED/.test(status)){factor*=.985;notes.push(`availability: ${status}`)}
+  return {...p,opponent:opp,nextGame:x?.game||null,matchupFactor:factor,matchupScore:clamp(50+(factor-1)*500,0,100),notes}
+ })
+}
+function pct(x){return `${(x*100).toFixed(1)}%`}
+export function buildEdges(board){
+ return board.flatMap(p=>{
+  const usage=p.targetsG+p.carriesG;
+  if(usage<5)return[];
+  const baseline=(p.position==='RB'?p.rushYdsG:p.recYdsG)||0;
+  const recent=(p.recentRecYdsG??baseline);
+  const edge=baseline?((recent-baseline)/Math.max(1,baseline)):0;
+  return [{...p,tier:playerTier(p),signal:edge,signalLabel:edge>=.08?'UP':edge<=-.08?'DOWN':'NEUTRAL',
+    confidence:clamp(40+p.games*6+(usage>=12?15:0),0,95),explanation:edge>=.08?'Recent production is above season baseline.':edge<=-.08?'Recent production is below season baseline.':'Recent production is near season baseline.'}]
+ })
+}
+export async function loadResearch(season=2026){
+ const [games,players,stats,injuries,depth,rosters]=await Promise.all([
+  fetchSeasonGames(season),fetchPlayers(),fetchSeasonStats(season),fetchInjuries(season),fetchDepthCharts(season),fetchRosters(season)
+ ]);
+ const statsData=stats.data||[], board=buildBoard(statsData);
+ const identity=[...(players.data||[]),...(rosters.data||[])];
+ const byId=new Map(identity.filter(x=>x.id).map(x=>[x.id,x]));
+ for(const p of board){const i=byId.get(p.playerId);if(i){p.player=i.name||p.player;p.team=p.team||i.team;p.position=p.position||i.position}}
+ const enriched=board.map(p=>summarizePlayer(p,statsData));
+ return {season,seasonUsed:statsData.length?season:null,games,players,stats,playerStats:stats,injuries,depth,rosters,board:enriched,
+   matchups:buildMatchups(enriched,games.data||[],injuries.data||[],depth.data||[]),edges:buildEdges(enriched),
+   meta:{counts:{players:players.data.length,stats:statsData.length,games:games.data.length,injuries:injuries.data.length,depth:depth.data.length,rosters:rosters.data.length},
+    sources:{players,stats,games,injuries,depth,rosters}}}
 }
