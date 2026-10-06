@@ -1,75 +1,13 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NFL Research Lab — Syntax Check</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NFL Research Lab — Step 10</title>
+<link rel="stylesheet" href="src/styles.css"/>
 </head>
-
-<body style="margin:0;background:#07101c;color:white;font-family:system-ui;padding:30px">
-
-<h1>NFL Research Lab</h1>
-<p>Finding the exact app.js syntax error...</p>
-
-<pre id="result" style="white-space:pre-wrap;background:#101b29;padding:20px;border-radius:10px"></pre>
-
-<script>
-async function check() {
-  const out = document.getElementById("result");
-
-  try {
-    const response = await fetch("./src/app.js?v=5");
-    const source = await response.text();
-
-    const lines = source.split("\n");
-
-    const code = lines
-      .filter(line => !line.trim().startsWith("import "))
-      .join("\n");
-
-    try {
-      new Function(code);
-
-      out.textContent = "✅ NO SYNTAX ERROR FOUND";
-    } catch (e) {
-      let msg = String(e.message || e);
-
-      out.textContent =
-        "❌ SYNTAX ERROR\n\n" +
-        msg +
-        "\n\n" +
-        "We are going to locate it automatically...\n\n";
-
-      // Test progressively larger sections to narrow down the error.
-      for (let end = 1; end <= lines.length; end++) {
-        const partial = lines
-          .slice(0, end)
-          .filter(line => !line.trim().startsWith("import "))
-          .join("\n");
-
-        try {
-          new Function(partial);
-        } catch (err) {
-          out.textContent +=
-            "First failing area is around line " + end + "\n\n" +
-            "Line " + end + ":\n" +
-            lines[end - 1] + "\n\n" +
-            "Nearby lines:\n\n" +
-            lines.slice(Math.max(0,end-5), Math.min(lines.length,end+5))
-              .map((x,i) => (Math.max(0,end-5)+i+1) + ": " + x)
-              .join("\n");
-
-          return;
-        }
-      }
-    }
-  } catch (e) {
-    out.textContent = "ERROR LOADING app.js\n\n" + String(e);
-  }
-}
-
-check();
-</script>
-
+<body>
+<div id="app"></div>
+<script type="module" src="src/app.js?v=10"></script>
 </body>
 </html>
