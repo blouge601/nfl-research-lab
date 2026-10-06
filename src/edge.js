@@ -46,7 +46,7 @@ function sdFor(market,baseline){
 function normalCdf(z){return .5*(1+erf(z/Math.SQRT2))}
 function erf(x){
  const s=x<0?-1:1,a=Math.abs(x),t=1/(1+.3275911*a);
- const y=1-((((((1.061405429*t-1.453152027)*t)+1.421413741)*t-.284496736)*t+.254829592)*t*Math.exp(-a*a);
+ const y=1-(((((1.061405429*t-1.453152027)*t+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-a*a));
  return s*y;
 }
 export function evaluateProp(prop,research){
