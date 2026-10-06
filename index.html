@@ -1,49 +1,75 @@
 <!doctype html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>NFL Research Lab Test</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NFL Research Lab — Syntax Check</title>
 </head>
-<body style="margin:0;background:#07101c;color:white;font-family:system-ui;padding:30px">
-  <h1>NFL Research Lab — Parser Test</h1>
-  <p>Testing app.js...</p>
-  <pre id="result" style="white-space:pre-wrap;background:#101b29;padding:20px;border-radius:10px"></pre>
 
-  <script>
-  async function testApp() {
-    const result = document.getElementById("result");
+<body style="margin:0;background:#07101c;color:white;font-family:system-ui;padding:30px">
+
+<h1>NFL Research Lab</h1>
+<p>Finding the exact app.js syntax error...</p>
+
+<pre id="result" style="white-space:pre-wrap;background:#101b29;padding:20px;border-radius:10px"></pre>
+
+<script>
+async function check() {
+  const out = document.getElementById("result");
+
+  try {
+    const response = await fetch("./src/app.js?v=4");
+    const source = await response.text();
+
+    const lines = source.split("\n");
+
+    const code = lines
+      .filter(line => !line.trim().startsWith("import "))
+      .join("\n");
 
     try {
-      const response = await fetch("./src/app.js?v=3");
-      const source = await response.text();
-      const lines = source.split("\n");
+      new Function(code);
 
-      const body = lines
-        .filter(line => !line.trim().startsWith("import "))
-        .join("\n");
+      out.textContent = "✅ NO SYNTAX ERROR FOUND";
+    } catch (e) {
+      let msg = String(e.message || e);
 
-      try {
-        new Function(body);
+      out.textContent =
+        "❌ SYNTAX ERROR\n\n" +
+        msg +
+        "\n\n" +
+        "We are going to locate it automatically...\n\n";
 
-        result.textContent =
-          "APP.JS PARSE TEST: OK\n\n" +
-          "No syntax error found.";
-      } catch (error) {
-        result.textContent =
-          "APP.JS PARSE TEST: FAILED\n\n" +
-          String(error.stack || error) +
-          "\n\n--- APP.JS LINES ---\n" +
-          lines.map((line, i) => (i + 1) + ": " + line).join("\n");
+      // Test progressively larger sections to narrow down the error.
+      for (let end = 1; end <= lines.length; end++) {
+        const partial = lines
+          .slice(0, end)
+          .filter(line => !line.trim().startsWith("import "))
+          .join("\n");
+
+        try {
+          new Function(partial);
+        } catch (err) {
+          out.textContent +=
+            "First failing area is around line " + end + "\n\n" +
+            "Line " + end + ":\n" +
+            lines[end - 1] + "\n\n" +
+            "Nearby lines:\n\n" +
+            lines.slice(Math.max(0,end-5), Math.min(lines.length,end+5))
+              .map((x,i) => (Math.max(0,end-5)+i+1) + ": " + x)
+              .join("\n");
+
+          return;
+        }
       }
-    } catch (error) {
-      result.textContent =
-        "Could not load app.js:\n\n" +
-        String(error.stack || error);
     }
+  } catch (e) {
+    out.textContent = "ERROR LOADING app.js\n\n" + String(e);
   }
+}
 
-  testApp();
-  </script>
+check();
+</script>
+
 </body>
 </html>
