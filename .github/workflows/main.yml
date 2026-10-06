@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "15 6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -22,6 +24,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Download current NFL data
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p data/nfl/2026
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o data/nfl/games.csv \
+            https://github.com/nflverse/nflverse-data/releases/download/schedules/games.csv
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o data/nfl/players.csv \
+            https://github.com/nflverse/nflverse-data/releases/download/players/players.csv
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o data/nfl/2026/stats_player_week_2026.csv \
+            https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_2026.csv
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o data/nfl/2026/injuries_2026.csv \
+            https://github.com/nflverse/nflverse-data/releases/download/injuries/injuries_2026.csv
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o data/nfl/2026/depth_charts_2026.csv \
+            https://github.com/nflverse/nflverse-data/releases/download/depth_charts/depth_charts_2026.csv
+
+          curl -L --fail --retry 3 --retry-delay 2 \
+            -o data/nfl/2026/roster_2026.csv \
+            https://github.com/nflverse/nflverse-data/releases/download/rosters/roster_2026.csv
+
+          echo "NFL data downloaded:"
+          find data/nfl -type f -printf "%p %s bytes\n"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
