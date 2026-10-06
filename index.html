@@ -1,41 +1,49 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>NFL Research Lab — Diagnostic</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NFL Research Lab Test</title>
 </head>
 <body style="margin:0;background:#07101c;color:white;font-family:system-ui;padding:30px">
-  <h1>NFL Research Lab — File Test</h1>
-  <p>Testing JavaScript files...</p>
+  <h1>NFL Research Lab — Parser Test</h1>
+  <p>Testing app.js...</p>
   <pre id="result" style="white-space:pre-wrap;background:#101b29;padding:20px;border-radius:10px"></pre>
 
-  <script type="module">
-    const files = [
-      "./src/data.js",
-      "./src/research.js",
-      "./src/edge.js",
-      "./src/model6.js",
-      "./matchup7.js",
-      "./feature8.js",
-      "./player9.js",
-      "./pipeline10.js",
-      "./src/app.js"
-    ];
-
+  <script>
+  async function testApp() {
     const result = document.getElementById("result");
-    result.textContent = "";
 
-    for (const file of files) {
+    try {
+      const response = await fetch("./src/app.js?v=3");
+      const source = await response.text();
+      const lines = source.split("\n");
+
+      const body = lines
+        .filter(line => !line.trim().startsWith("import "))
+        .join("\n");
+
       try {
-        await import(file + "?test=" + Date.now());
-        result.textContent += "✅ " + file + " — OK\n";
+        new Function(body);
+
+        result.textContent =
+          "APP.JS PARSE TEST: OK\n\n" +
+          "No syntax error found.";
       } catch (error) {
-        result.textContent += "\n❌ " + file + " — FAILED\n";
-        result.textContent += String(error?.stack || error) + "\n";
-        break;
+        result.textContent =
+          "APP.JS PARSE TEST: FAILED\n\n" +
+          String(error.stack || error) +
+          "\n\n--- APP.JS LINES ---\n" +
+          lines.map((line, i) => (i + 1) + ": " + line).join("\n");
       }
+    } catch (error) {
+      result.textContent =
+        "Could not load app.js:\n\n" +
+        String(error.stack || error);
     }
+  }
+
+  testApp();
   </script>
 </body>
 </html>
