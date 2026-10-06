@@ -1,1 +1,30 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>NFL Research Lab — Step 10</title><link rel="stylesheet" href="src/styles.css"/></head><body><div id="app"></div><script type="module" src="src/app.js"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NFL Research Lab — Step 10</title>
+  <link rel="stylesheet" href="src/styles.css"/>
+</head>
+<body>
+  <div id="app">
+    <div style="padding:40px;font-family:system-ui;color:white;background:#07101c;min-height:100vh">
+      <h1>NFL Research Lab</h1>
+      <p>Starting application...</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import("./src/app.js")
+      .catch(error => {
+        document.getElementById("app").innerHTML = `
+          <div style="padding:40px;font-family:system-ui;color:white;background:#07101c;min-height:100vh">
+            <h1>NFL Research Lab — Startup Error</h1>
+            <p>The application loaded, but JavaScript failed to start.</p>
+            <pre style="white-space:pre-wrap;color:#ff8585;background:#101b29;padding:20px;border-radius:10px">${String(error?.stack || error)}</pre>
+          </div>
+        `;
+      });
+  </script>
+</body>
+</html>
