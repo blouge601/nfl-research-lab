@@ -1,10 +1,10 @@
-import {loadResearch,researchPlayer} from './research.js';
-import {parseMarketText,evaluateProp} from './edge.js';
-import {buildPrediction,bestBetGate} from './model6.js';
-import {buildMatchupProfile,defensiveRankings} from '../matchup7.js';
-import {buildFeatureWarehouse,warehouseToMatchup,parseFeatureText,positionMatchupScore} from '../feature8.js';
-import {buildPlayerMatchupBoard,parsePlayerText,backtestMatchupFeature} from '../player9.js';
-import {buildOperationsReport,featureAblation,sourceHealth,freshnessGate,parseOpsText} from '../pipeline10.js';
+import {loadResearch,researchPlayer} from './research.js?v=11';
+import {parseMarketText,evaluateProp} from './edge.js?v=11';
+import {buildPrediction,bestBetGate} from './model6.js?v=11';
+import {buildMatchupProfile,defensiveRankings} from '../matchup7.js?v=11';
+import {buildFeatureWarehouse,warehouseToMatchup,parseFeatureText,positionMatchupScore} from '../feature8.js?v=11';
+import {buildPlayerMatchupBoard,parsePlayerText,backtestMatchupFeature} from '../player9.js?v=11';
+import {buildOperationsReport,featureAblation,sourceHealth,freshnessGate,parseOpsText} from '../pipeline10.js?v=11';
 
 const CACHE='nfl-lab-step10-features-v1', PCACHE='nfl-lab-step10-player-v1', OCACHE='nfl-lab-step10-ops-v1';
 const S={page:'Player Matchups',season:2026,data:null,props:[],defenses:[],offenses:[],warehouse:null,playerRows:[],playerBoard:[],loading:true,q:'',minScore:55,featureText:'',playerText:'',message:'',opsRows:[],opsReport:null};

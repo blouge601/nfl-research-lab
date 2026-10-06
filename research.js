@@ -1,4 +1,4 @@
-import {fetchSeasonGames,fetchSeasonStats,fetchPlayers,fetchInjuries} from './data.js';
+import {fetchSeasonGames,fetchSeasonStats,fetchPlayers,fetchInjuries,fetchDepthCharts,fetchRosters} from './data.js';
 
 const avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
 const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
@@ -49,6 +49,28 @@ export function buildBoard(stats,games,injuries){
  .sort((a,b)=>(b.role+b.signals*2)-(a.role+a.signals*2));
 }
 export async function loadResearch(season){
- const [games,players,stats,injuries]=await Promise.all([fetchSeasonGames(season),fetchPlayers(season),fetchSeasonStats(season),fetchInjuries(season)]);
- return {season, games, players, stats, playerStats:stats, injuries, depth:{data:[],source:'nflverse rosters/depth charts',live:false,error:'Configure depth-chart endpoint for browser ingestion'}, board:buildBoard(stats.data||[],games.data||[],injuries.data||[])};
+ const [games,players,stats,injuries,depth,rosters]=await Promise.all([
+   fetchSeasonGames(season),
+   fetchPlayers(),
+   fetchSeasonStats(season),
+   fetchInjuries(season),
+   fetchDepthCharts(season),
+   fetchRosters(season)
+ ]);
+ const playerMap=new Map((players.data||[]).map(p=>[p.id,p]));
+ for(const r of rosters.data||[]) if(r.id&&!playerMap.has(r.id)) playerMap.set(r.id,r);
+ const playerData=[...playerMap.values()];
+ const statsData=stats.data||[];
+ const board=buildBoard(statsData,games.data||[],injuries.data||[]);
+ return {
+   season,
+   seasonUsed:stats.seasonUsed||season,
+   games, players:{...players,data:playerData}, stats, playerStats:stats, injuries, depth, rosters,
+   board,
+   meta:{
+     statsFallback:!!stats.fallback,
+     sources:{games:games.source,players:players.source,stats:stats.source,injuries:injuries.source,depth:depth.source,rosters:rosters.source},
+     counts:{games:games.data?.length||0,players:playerData.length,stats:statsData.length,injuries:injuries.data?.length||0,depth:depth.data?.length||0,rosters:rosters.data?.length||0}
+   }
+ };
 }
